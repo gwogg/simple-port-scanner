@@ -1,0 +1,93 @@
+import socket
+from datetime import datetime
+import argparse
+import ipaddress
+
+# Dictionary mapping common port numbers to their typical functions
+common_ports = {
+    20: "FTP Data Transfer",
+    21: "FTP Control",
+    22: "SSH",
+    23: "Telnet",
+    25: "SMTP",
+    53: "DNS",
+    80: "HTTP",
+    110: "POP3",
+    143: "IMAP",
+    443: "HTTPS",
+    3389: "RDP",
+    # Add more common ports and their functions as needed
+}
+
+def is_valid_ip(address):
+    try:
+        ipaddress.ip_address(address)
+        return True
+    except ValueError:
+        return False
+
+def port_scan(target, start_port, end_port, timeout):
+    print(f"Scanning target: {target}")
+    print(f"Scanning ports: {start_port} to {end_port}")
+    print(f"Time started: {datetime.now()}")
+    print("-" * 50)
+
+    open_ports = []
+
+    try:
+        total_ports = end_port - start_port + 1
+        scanned_ports = 0
+
+        for port in range(start_port, end_port + 1):
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            socket.setdefaulttimeout(timeout)
+            result = s.connect_ex((target, port))
+            scanned_ports += 1
+
+            # Print progress bar
+            progress = scanned_ports / total_ports * 100
+            print(f"\rScanning port {port}... [{progress:.2f}%]", end="", flush=True)
+
+            if result == 0:
+                service = common_ports.get(port, "Unknown Service")
+                open_ports.append((port, service))
+            s.close()
+
+        print("\n")  # Move to the next line after progress bar
+    except KeyboardInterrupt:
+        print("\nExiting program.")
+    except socket.gaierror:
+        print("\nHostname could not be resolved.")
+    except socket.error:
+        print("\nServer not responding.")
+    finally:
+        print(f"Scan completed at: {datetime.now()}")
+        print("-" * 50)
+
+    # If no open ports found
+    if not open_ports:
+        print("No open ports found.")
+    else:
+        for port, service in open_ports:
+            print(f"Port {port}: Open ({service})")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Simple Port Scanner")
+    parser.add_argument("--target", type=str, help="Target IP address (IPv4 or IPv6)")
+    parser.add_argument("--start_port", type=int, help="Start port")
+    parser.add_argument("--end_port", type=int, help="End port")
+    parser.add_argument("--timeout", type=float, default=1.0, help="Timeout for each port scan (default: 1.0s)")
+
+    args = parser.parse_args()
+
+    # Validate and prompt for target IP address if not provided or invalid
+    while not (args.target and is_valid_ip(args.target)):
+        print("Invalid target IP address format. Please enter a valid IPv4 or IPv6 address.")
+        args.target = input("Enter target IP address: ")
+
+    # If arguments are not provided, prompt user to enter them interactively
+    if not (args.start_port and args.end_port):
+        args.start_port = int(input("Enter start port number: "))
+        args.end_port = int(input("Enter end port number: "))
+
+    port_scan(args.target, args.start_port, args.end_port, args.timeout)
